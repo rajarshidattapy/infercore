@@ -13,35 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download ONNX Runtime (Linux, PyPI wheel + headers)
+      - name: Download ONNX Runtime (Linux, PyPI wheel + jsDelivr headers)
         if: runner.os == 'Linux'
         run: |
           python3 -m pip download onnxruntime --no-deps --only-binary=:all: -d ort_pkg -q
-          python3 - <<'PY'
-          import glob, os, re, shutil, zipfile
-          whl = sorted(glob.glob('ort_pkg/*.whl'))[-1]
-          ver = re.search(r'onnxruntime-([0-9.]+)-', os.path.basename(whl)).group(1)
-          os.makedirs('ort/lib', exist_ok=True)
-          os.makedirs('ort/include', exist_ok=True)
-          with zipfile.ZipFile(whl) as z:
-              for n in z.namelist():
-                  base = os.path.basename(n)
-                  if n.startswith('onnxruntime/capi/libonnxruntime') and base:
-                      with z.open(n) as f, open(os.path.join('ort/lib', base), 'wb') as o:
-                          shutil.copyfileobj(f, o)
-          real = next(f for f in os.listdir('ort/lib') if f.startswith('libonnxruntime.so.1.'))
-          for alias in ('libonnxruntime.so.1', 'libonnxruntime.so'):
-              p = os.path.join('ort/lib', alias)
-              if os.path.lexists(p):
-                  os.remove(p)
-              os.symlink(real, p)
-          open('ort_version.txt', 'w').write(ver)
-          print('ONNX Runtime wheel version:', ver)
-PY
-          VER=$(cat ort_version.txt)
-          for h in onnxruntime_c_api.h onnxruntime_cxx_api.h onnxruntime_cxx_inline.h onnxruntime_ep_c_api.h onnxruntime_float16.h onnxruntime_lite_custom_op.h onnxruntime_run_options_config_keys.h; do
-            curl -fSL --retry 2 -o "ort/include/$h" "https://cdn.jsdelivr.net/gh/microsoft/onnxruntime@v${VER}/include/onnxruntime/core/session/$h"
-          done
+          python3 tools/extract_ort.py ort_pkg ort
           ls -la ort/lib ort/include
 
       - name: Download ONNX Runtime (Windows, NuGet)
@@ -100,34 +76,10 @@ PY
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download ONNX Runtime (PyPI wheel + headers)
+      - name: Download ONNX Runtime (PyPI wheel + jsDelivr headers)
         run: |
           python3 -m pip download onnxruntime --no-deps --only-binary=:all: -d ort_pkg -q
-          python3 - <<'PY'
-          import glob, os, re, shutil, zipfile
-          whl = sorted(glob.glob('ort_pkg/*.whl'))[-1]
-          ver = re.search(r'onnxruntime-([0-9.]+)-', os.path.basename(whl)).group(1)
-          os.makedirs('ort/lib', exist_ok=True)
-          os.makedirs('ort/include', exist_ok=True)
-          with zipfile.ZipFile(whl) as z:
-              for n in z.namelist():
-                  base = os.path.basename(n)
-                  if n.startswith('onnxruntime/capi/libonnxruntime') and base:
-                      with z.open(n) as f, open(os.path.join('ort/lib', base), 'wb') as o:
-                          shutil.copyfileobj(f, o)
-          real = next(f for f in os.listdir('ort/lib') if f.startswith('libonnxruntime.so.1.'))
-          for alias in ('libonnxruntime.so.1', 'libonnxruntime.so'):
-              p = os.path.join('ort/lib', alias)
-              if os.path.lexists(p):
-                  os.remove(p)
-              os.symlink(real, p)
-          open('ort_version.txt', 'w').write(ver)
-          print('ONNX Runtime wheel version:', ver)
-PY
-          VER=$(cat ort_version.txt)
-          for h in onnxruntime_c_api.h onnxruntime_cxx_api.h onnxruntime_cxx_inline.h onnxruntime_ep_c_api.h onnxruntime_float16.h onnxruntime_lite_custom_op.h onnxruntime_run_options_config_keys.h; do
-            curl -fSL --retry 2 -o "ort/include/$h" "https://cdn.jsdelivr.net/gh/microsoft/onnxruntime@v${VER}/include/onnxruntime/core/session/$h"
-          done
+          python3 tools/extract_ort.py ort_pkg ort
       - name: Configure and build
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DONNXRUNTIME_ROOT="$PWD/ort"
