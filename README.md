@@ -90,6 +90,20 @@ Initial run — sandbox, 1 vCPU Intel Xeon Platinum 8375C, GCC 11.4, `-O3`
 Per-op breakdown (native, mean over 50 runs): conv1 34.9 us, conv2 50.1 us,
 everything else < 15 us — convolutions dominate, as expected.
 
+CI run — `ubuntu-latest` GitHub-hosted runner, 4 vCPUs
+(`--iterations 1000 --eval-n 2000`, [run log](https://github.com/rajarshidattapy/infercore/actions/runs/45328859463/job/138224876675)):
+
+| Metric | fp32 (native) | int8 (native) | ONNX Runtime fp32 |
+|---|---|---|---|
+| Mean latency, batch 1 | 146.0 us (1 thread) / 146.6 us (4 threads) | 213.3 us | 21.7 us |
+| p50 / p95 latency | 144.5 / 152.8 us | 210.8 / 222.3 us | 19.0 / 21.4 us |
+| Accuracy (2,000 test images) | 96.10% | 96.15% | - |
+| Weights on disk | 21,254 B | 5,730 B (**3.71x smaller**) | - |
+| Max abs diff vs native fp32 | - | 0.101 (probs) | **2.4e-07** |
+
+![Benchmark: latency and per-op breakdown](docs/screenshots/benchmark-latency.png)
+![Benchmark: accuracy and model size](docs/screenshots/benchmark-accuracy-size.png)
+
 Honest notes:
 
 - **INT8 here trades speed for size, not speed for accuracy.** The int8 kernels are
@@ -121,6 +135,9 @@ third_party/         vendored GoogleTest 1.15.2 + SQLite amalgamation
 Every push builds and tests on **Ubuntu and Windows**, runs the test suite under
 **ASan+UBSan**, and runs the benchmark, uploading `bench_results.txt` and
 `bench_results.db` as artifacts.
+
+![CI green: Linux + Windows builds, ASan/UBSan, benchmark](docs/screenshots/ci-green.png)
+![GoogleTest 4/4 and the dlopen demo on the CI runner](docs/screenshots/tests-and-demo.png)
 
 ## Regenerating the model
 
