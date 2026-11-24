@@ -9,7 +9,9 @@
 
 #include <stdint.h>
 
-#if defined(_WIN32)
+#if defined(INFERCORE_STATIC)
+#  define IC_API
+#elif defined(_WIN32)
 #  if defined(INFERCORE_BUILD)
 #    define IC_API __declspec(dllexport)
 #  else

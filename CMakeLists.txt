@@ -50,6 +50,7 @@ set(IC_SOURCES
 
 add_library(infercore_static STATIC ${IC_SOURCES})
 target_include_directories(infercore_static PUBLIC include)
+target_compile_definitions(infercore_static PUBLIC INFERCORE_STATIC)
 
 add_library(infercore SHARED ${IC_SOURCES})
 target_include_directories(infercore PUBLIC include)
