@@ -32,9 +32,13 @@ jobs:
           Invoke-WebRequest -Uri "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/$ver/microsoft.ml.onnxruntime.$ver.nupkg" -OutFile ort.nupkg
           Expand-Archive ort.nupkg -DestinationPath ort_nuget
           New-Item -ItemType Directory -Force ort\lib, ort\include | Out-Null
-          Copy-Item ort_nuget\runtimes\win-x64\native\onnxruntime.dll ort\lib\
-          Copy-Item ort_nuget\build\native\lib\onnxruntime.lib ort\lib\
-          Copy-Item ort_nuget\build\native\include\*.h ort\include\
+          $dll = Get-ChildItem -Recurse ort_nuget -Filter onnxruntime.dll | Where-Object { $_.FullName -match 'win-x64' } | Select-Object -First 1
+          $lib = Get-ChildItem -Recurse ort_nuget -Filter onnxruntime.lib | Select-Object -First 1
+          if (-not $dll -or -not $lib) { Get-ChildItem -Recurse ort_nuget | Select-Object FullName; Write-Error "onnxruntime.dll/.lib not found in nupkg"; exit 1 }
+          Copy-Item $dll.FullName ort\lib\
+          Copy-Item $lib.FullName ort\lib\
+          $hdrs = Get-ChildItem -Recurse ort_nuget -Filter onnxruntime_c_api.h | Select-Object -First 1
+          if ($hdrs) { Copy-Item (Join-Path $hdrs.DirectoryName '*.h') ort\include\ } else { Copy-Item third_party\onnxruntime\include\onnxruntime\core\session\*.h ort\include\ }
           Get-ChildItem ort\lib, ort\include
 
       - name: Configure
