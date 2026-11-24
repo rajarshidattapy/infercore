@@ -28,24 +28,24 @@ jobs:
             echo "GitHub asset unavailable; falling back to PyPI wheel + jsDelivr headers"
             python3 -m pip download onnxruntime==${ORT_VERSION} --no-deps --only-binary=:all: -d ort_pkg -q
             python3 - <<'PY'
-          import glob, os, shutil, zipfile
-          whl = glob.glob('ort_pkg/*.whl')[0]
-          os.makedirs('ort/lib', exist_ok=True)
-          os.makedirs('ort/include', exist_ok=True)
-          with zipfile.ZipFile(whl) as z:
-              for n in z.namelist():
-                  base = os.path.basename(n)
-                  if n.startswith('onnxruntime/capi/libonnxruntime') and base:
-                      with z.open(n) as f, open(os.path.join('ort/lib', base), 'wb') as o:
-                          shutil.copyfileobj(f, o)
-          real = next(f for f in os.listdir('ort/lib') if f.startswith('libonnxruntime.so.1.'))
-          for alias in ('libonnxruntime.so.1', 'libonnxruntime.so'):
-              p = os.path.join('ort/lib', alias)
-              if os.path.exists(p):
-                  os.remove(p)
-              os.symlink(real, p)
-          print('extracted', real)
-PY
+            import glob, os, shutil, zipfile
+            whl = glob.glob('ort_pkg/*.whl')[0]
+            os.makedirs('ort/lib', exist_ok=True)
+            os.makedirs('ort/include', exist_ok=True)
+            with zipfile.ZipFile(whl) as z:
+                for n in z.namelist():
+                    base = os.path.basename(n)
+                    if n.startswith('onnxruntime/capi/libonnxruntime') and base:
+                        with z.open(n) as f, open(os.path.join('ort/lib', base), 'wb') as o:
+                            shutil.copyfileobj(f, o)
+            real = next(f for f in os.listdir('ort/lib') if f.startswith('libonnxruntime.so.1.'))
+            for alias in ('libonnxruntime.so.1', 'libonnxruntime.so'):
+                p = os.path.join('ort/lib', alias)
+                if os.path.exists(p):
+                    os.remove(p)
+                os.symlink(real, p)
+            print('extracted', real)
+            PY
             for h in onnxruntime_c_api.h onnxruntime_cxx_api.h onnxruntime_cxx_inline.h onnxruntime_ep_c_api.h onnxruntime_float16.h onnxruntime_lite_custom_op.h onnxruntime_run_options_config_keys.h; do
               curl -fSL --retry 2 -o "ort/include/$h" "https://cdn.jsdelivr.net/gh/microsoft/onnxruntime@v${ORT_VERSION}/include/onnxruntime/core/session/$h"
             done
@@ -127,24 +127,24 @@ PY
             echo "GitHub asset unavailable; falling back to PyPI wheel + jsDelivr headers"
             python3 -m pip download onnxruntime==${ORT_VERSION} --no-deps --only-binary=:all: -d ort_pkg -q
             python3 - <<'PY'
-          import glob, os, shutil, zipfile
-          whl = glob.glob('ort_pkg/*.whl')[0]
-          os.makedirs('ort/lib', exist_ok=True)
-          os.makedirs('ort/include', exist_ok=True)
-          with zipfile.ZipFile(whl) as z:
-              for n in z.namelist():
-                  base = os.path.basename(n)
-                  if n.startswith('onnxruntime/capi/libonnxruntime') and base:
-                      with z.open(n) as f, open(os.path.join('ort/lib', base), 'wb') as o:
-                          shutil.copyfileobj(f, o)
-          real = next(f for f in os.listdir('ort/lib') if f.startswith('libonnxruntime.so.1.'))
-          for alias in ('libonnxruntime.so.1', 'libonnxruntime.so'):
-              p = os.path.join('ort/lib', alias)
-              if os.path.exists(p):
-                  os.remove(p)
-              os.symlink(real, p)
-          print('extracted', real)
-PY
+            import glob, os, shutil, zipfile
+            whl = glob.glob('ort_pkg/*.whl')[0]
+            os.makedirs('ort/lib', exist_ok=True)
+            os.makedirs('ort/include', exist_ok=True)
+            with zipfile.ZipFile(whl) as z:
+                for n in z.namelist():
+                    base = os.path.basename(n)
+                    if n.startswith('onnxruntime/capi/libonnxruntime') and base:
+                        with z.open(n) as f, open(os.path.join('ort/lib', base), 'wb') as o:
+                            shutil.copyfileobj(f, o)
+            real = next(f for f in os.listdir('ort/lib') if f.startswith('libonnxruntime.so.1.'))
+            for alias in ('libonnxruntime.so.1', 'libonnxruntime.so'):
+                p = os.path.join('ort/lib', alias)
+                if os.path.exists(p):
+                    os.remove(p)
+                os.symlink(real, p)
+            print('extracted', real)
+            PY
             for h in onnxruntime_c_api.h onnxruntime_cxx_api.h onnxruntime_cxx_inline.h onnxruntime_ep_c_api.h onnxruntime_float16.h onnxruntime_lite_custom_op.h onnxruntime_run_options_config_keys.h; do
               curl -fSL --retry 2 -o "ort/include/$h" "https://cdn.jsdelivr.net/gh/microsoft/onnxruntime@v${ORT_VERSION}/include/onnxruntime/core/session/$h"
             done
