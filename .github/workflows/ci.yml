@@ -33,7 +33,10 @@ jobs:
           Expand-Archive ort.nupkg -DestinationPath ort_nuget
           New-Item -ItemType Directory -Force ort\lib, ort\include | Out-Null
           $dll = Get-ChildItem -Recurse ort_nuget -Filter onnxruntime.dll | Where-Object { $_.FullName -match 'win-x64' } | Select-Object -First 1
-          $lib = Get-ChildItem -Recurse ort_nuget -Filter onnxruntime.lib | Select-Object -First 1
+          $lib = Get-ChildItem -Recurse ort_nuget -Filter onnxruntime.lib | Where-Object { $_.FullName -match 'win-x64' } | Select-Object -First 1
+          if (-not $lib) { $lib = Get-ChildItem -Recurse ort_nuget -Filter onnxruntime.lib | Select-Object -First 1 }
+          Write-Output "dll: $($dll.FullName)"
+          Write-Output "lib: $($lib.FullName)"
           if (-not $dll -or -not $lib) { Get-ChildItem -Recurse ort_nuget | Select-Object FullName; Write-Error "onnxruntime.dll/.lib not found in nupkg"; exit 1 }
           Copy-Item $dll.FullName ort\lib\
           Copy-Item $lib.FullName ort\lib\
