@@ -1,0 +1,63 @@
+{
+  "name": "mnist-cnn",
+  "input_name": "input",
+  "input_shape": [
+    1,
+    1,
+    28,
+    28
+  ],
+  "output_layer": "softmax",
+  "layers": [
+    {
+      "name": "conv1",
+      "type": "Conv2D",
+      "stride": 1,
+      "pad": 0,
+      "weights": "conv1.w",
+      "bias": "conv1.b"
+    },
+    {
+      "name": "relu1",
+      "type": "ReLU"
+    },
+    {
+      "name": "pool1",
+      "type": "MaxPool",
+      "kernel": 2,
+      "stride": 2
+    },
+    {
+      "name": "conv2",
+      "type": "Conv2D",
+      "stride": 1,
+      "pad": 0,
+      "weights": "conv2.w",
+      "bias": "conv2.b"
+    },
+    {
+      "name": "relu2",
+      "type": "ReLU"
+    },
+    {
+      "name": "pool2",
+      "type": "MaxPool",
+      "kernel": 2,
+      "stride": 2
+    },
+    {
+      "name": "flatten",
+      "type": "Flatten"
+    },
+    {
+      "name": "fc1",
+      "type": "Gemm",
+      "weights": "fc1.w",
+      "bias": "fc1.b"
+    },
+    {
+      "name": "softmax",
+      "type": "Softmax"
+    }
+  ]
+}

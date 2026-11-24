@@ -1,0 +1,98 @@
+name: CI
+
+on: [push, pull_request]
+
+env:
+  ORT_VERSION: 1.23.2
+
+jobs:
+  build-test:
+    name: build-test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download ONNX Runtime (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          curl -sSL -o ort.tgz https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz
+          tar xzf ort.tgz
+          mv onnxruntime-linux-x64-${ORT_VERSION} ort
+
+      - name: Download ONNX Runtime (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/microsoft/onnxruntime/releases/download/v${{ env.ORT_VERSION }}/onnxruntime-win-x64-${{ env.ORT_VERSION }}.zip" -OutFile ort.zip
+          Expand-Archive ort.zip -DestinationPath .
+          Move-Item "onnxruntime-win-x64-${{ env.ORT_VERSION }}" ort
+
+      - name: Configure
+        shell: bash
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DONNXRUNTIME_ROOT="$PWD/ort"
+
+      - name: Build
+        shell: bash
+        run: cmake --build build --config Release -j 4
+
+      - name: Run tests (GoogleTest)
+        shell: bash
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Run dlopen/LoadLibrary demo
+        shell: bash
+        run: |
+          cd build
+          export INFERCORE_LIB="$(pwd)/libinfercore.so"
+          if [ "$RUNNER_OS" = "Windows" ]; then export INFERCORE_LIB="$(pwd)/Release/infercore.dll"; fi
+          ./infercore_demo ../models/mnist_cnn.json ../models/mnist_fp32.weights ../models/mnist_int8.weights ../models/sample_demo.bin || \
+          ./Release/infercore_demo ../models/mnist_cnn.json ../models/mnist_fp32.weights ../models/mnist_int8.weights ../models/sample_demo.bin
+
+  sanitizers:
+    name: asan-ubsan (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DINFERCORE_WITH_ONNX=OFF -DINFERCORE_SANITIZERS=ON
+      - name: Build
+        run: cmake --build build -j 4
+      - name: Run tests under ASan+UBSan
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: ctest --test-dir build --output-on-failure
+
+  benchmark:
+    name: benchmark (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download ONNX Runtime
+        run: |
+          curl -sSL -o ort.tgz https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz
+          tar xzf ort.tgz
+          mv onnxruntime-linux-x64-${ORT_VERSION} ort
+      - name: Configure and build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DONNXRUNTIME_ROOT="$PWD/ort"
+          cmake --build build -j 4
+      - name: Download MNIST test set
+        run: |
+          mkdir -p models/mnist
+          curl -sSL https://ossci-datasets.s3.amazonaws.com/mnist/t10k-images-idx3-ubyte.gz | gunzip > models/mnist/t10k-images-idx3-ubyte
+          curl -sSL https://ossci-datasets.s3.amazonaws.com/mnist/t10k-labels-idx1-ubyte.gz | gunzip > models/mnist/t10k-labels-idx1-ubyte
+      - name: Run benchmark
+        run: |
+          ./build/infercore_benchmark --models-dir models --iterations 1000 --eval-n 2000 --db bench_results.db 2>&1 | tee bench_results.txt
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            bench_results.txt
+            bench_results.db
