@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -fsanitize=address,undefined CMakeFiles/test_golden_onnx.dir/tests/test_golden_onnx.cpp.o -o test_golden_onnx  libinfercore_static.a third_party/googletest/libgtest_main.a -ldl third_party/googletest/libgtest.a 

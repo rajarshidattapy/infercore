@@ -83,10 +83,6 @@ function(ic_deploy_runtime target)
   endif()
 endfunction()
 
-if(UNIX)
-  set_target_properties(infercore PROPERTIES BUILD_RPATH "$ORIGIN")
-endif()
-
 # ---------------------------------------------------------------- demo (dlopen/LoadLibrary)
 add_executable(infercore_demo demo/demo.cpp)
 target_include_directories(infercore_demo PRIVATE include)

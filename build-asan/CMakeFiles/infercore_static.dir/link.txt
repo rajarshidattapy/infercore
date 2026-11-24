@@ -1,0 +1,2 @@
+/usr/bin/ar qc libinfercore_static.a CMakeFiles/infercore_static.dir/src/tensor.cpp.o CMakeFiles/infercore_static.dir/src/thread_pool.cpp.o CMakeFiles/infercore_static.dir/src/kernels.cpp.o CMakeFiles/infercore_static.dir/src/json.cpp.o CMakeFiles/infercore_static.dir/src/ops.cpp.o CMakeFiles/infercore_static.dir/src/weights.cpp.o CMakeFiles/infercore_static.dir/src/native_model.cpp.o CMakeFiles/infercore_static.dir/src/onnx_model.cpp.o CMakeFiles/infercore_static.dir/src/infercore_c.cpp.o
+/usr/bin/ranlib libinfercore_static.a

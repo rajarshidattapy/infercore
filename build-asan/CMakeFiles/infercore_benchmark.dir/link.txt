@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -fsanitize=address,undefined CMakeFiles/infercore_benchmark.dir/bench/benchmark.cpp.o -o infercore_benchmark  libinfercore_static.a libsqlite3_vendored.a -ldl 
