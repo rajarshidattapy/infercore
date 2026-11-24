@@ -2,9 +2,6 @@ name: CI
 
 on: [push, pull_request]
 
-env:
-  ORT_VERSION: 1.23.2
-
 jobs:
   build-test:
     name: build-test (${{ matrix.os }})
@@ -16,64 +13,51 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download ONNX Runtime (Linux)
+      - name: Download ONNX Runtime (Linux, PyPI wheel + headers)
         if: runner.os == 'Linux'
         run: |
-          url="https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz"
-          echo "Trying GitHub release asset: $url"
-          if curl -fSL --retry 2 --retry-all-errors -o ort.tgz "$url" && gzip -t ort.tgz 2>/dev/null; then
-            tar xzf ort.tgz
-            mv onnxruntime-linux-x64-${ORT_VERSION} ort
-          else
-            echo "GitHub asset unavailable; falling back to PyPI wheel + jsDelivr headers"
-            python3 -m pip download onnxruntime==${ORT_VERSION} --no-deps --only-binary=:all: -d ort_pkg -q
-            python3 - <<'PY'
-          import glob, os, shutil, zipfile
-          whl = glob.glob('ort_pkg/*.whl')[0]
+          python3 -m pip download onnxruntime --no-deps --only-binary=:all: -d ort_pkg -q
+          python3 - <<'PY'
+          import glob, os, re, shutil, zipfile
+          whl = sorted(glob.glob('ort_pkg/*.whl'))[-1]
+          ver = re.search(r'onnxruntime-([0-9.]+)-', os.path.basename(whl)).group(1)
           os.makedirs('ort/lib', exist_ok=True)
           os.makedirs('ort/include', exist_ok=True)
           with zipfile.ZipFile(whl) as z:
-          for n in z.namelist():
-          base = os.path.basename(n)
-          if n.startswith('onnxruntime/capi/libonnxruntime') and base:
-          with z.open(n) as f, open(os.path.join('ort/lib', base), 'wb') as o:
-          shutil.copyfileobj(f, o)
+              for n in z.namelist():
+                  base = os.path.basename(n)
+                  if n.startswith('onnxruntime/capi/libonnxruntime') and base:
+                      with z.open(n) as f, open(os.path.join('ort/lib', base), 'wb') as o:
+                          shutil.copyfileobj(f, o)
           real = next(f for f in os.listdir('ort/lib') if f.startswith('libonnxruntime.so.1.'))
           for alias in ('libonnxruntime.so.1', 'libonnxruntime.so'):
-          p = os.path.join('ort/lib', alias)
-          if os.path.exists(p):
-          os.remove(p)
-          os.symlink(real, p)
-          print('extracted', real)
-          PY
-            for h in onnxruntime_c_api.h onnxruntime_cxx_api.h onnxruntime_cxx_inline.h onnxruntime_ep_c_api.h onnxruntime_float16.h onnxruntime_lite_custom_op.h onnxruntime_run_options_config_keys.h; do
-              curl -fSL --retry 2 -o "ort/include/$h" "https://cdn.jsdelivr.net/gh/microsoft/onnxruntime@v${ORT_VERSION}/include/onnxruntime/core/session/$h"
-            done
-          fi
-          ls -la ort/lib | head
+              p = os.path.join('ort/lib', alias)
+              if os.path.lexists(p):
+                  os.remove(p)
+              os.symlink(real, p)
+          open('ort_version.txt', 'w').write(ver)
+          print('ONNX Runtime wheel version:', ver)
+PY
+          VER=$(cat ort_version.txt)
+          for h in onnxruntime_c_api.h onnxruntime_cxx_api.h onnxruntime_cxx_inline.h onnxruntime_ep_c_api.h onnxruntime_float16.h onnxruntime_lite_custom_op.h onnxruntime_run_options_config_keys.h; do
+            curl -fSL --retry 2 -o "ort/include/$h" "https://cdn.jsdelivr.net/gh/microsoft/onnxruntime@v${VER}/include/onnxruntime/core/session/$h"
+          done
+          ls -la ort/lib ort/include
 
-      - name: Download ONNX Runtime (Windows)
+      - name: Download ONNX Runtime (Windows, NuGet)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $ver = "${{ env.ORT_VERSION }}"
-          $url = "https://github.com/microsoft/onnxruntime/releases/download/v$ver/onnxruntime-win-x64-$ver.zip"
-          Write-Output "Trying GitHub release asset: $url"
-          $ok = $false
-          try { Invoke-WebRequest -Uri $url -OutFile ort.zip; $ok = $true } catch { Write-Output "github asset failed: $($_.Exception.Message)" }
-          if ($ok) {
-            Expand-Archive ort.zip -DestinationPath .
-            Move-Item "onnxruntime-win-x64-$ver" ort
-          } else {
-            Write-Output "Falling back to NuGet package Microsoft.ML.OnnxRuntime $ver"
-            Invoke-WebRequest -Uri "https://www.nuget.org/api/v2/package/Microsoft.ML.OnnxRuntime/$ver" -OutFile ort.nupkg
-            Expand-Archive ort.nupkg -DestinationPath ort_nuget
-            New-Item -ItemType Directory -Force ort\lib, ort\include | Out-Null
-            Copy-Item ort_nuget\runtimes\win-x64\native\onnxruntime.dll ort\lib\
-            Copy-Item ort_nuget\build\native\lib\onnxruntime.lib ort\lib\
-            Copy-Item ort_nuget\build\native\include\*.h ort\include\
-          }
-          Get-ChildItem ort\lib
+          $idx = Invoke-RestMethod "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/index.json"
+          $ver = $idx.versions[-1]
+          Write-Output "ONNX Runtime NuGet version: $ver"
+          Invoke-WebRequest -Uri "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/$ver/microsoft.ml.onnxruntime.$ver.nupkg" -OutFile ort.nupkg
+          Expand-Archive ort.nupkg -DestinationPath ort_nuget
+          New-Item -ItemType Directory -Force ort\lib, ort\include | Out-Null
+          Copy-Item ort_nuget\runtimes\win-x64\native\onnxruntime.dll ort\lib\
+          Copy-Item ort_nuget\build\native\lib\onnxruntime.lib ort\lib\
+          Copy-Item ort_nuget\build\native\include\*.h ort\include\
+          Get-ChildItem ort\lib, ort\include
 
       - name: Configure
         shell: bash
@@ -116,40 +100,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download ONNX Runtime 
+      - name: Download ONNX Runtime (PyPI wheel + headers)
         run: |
-          url="https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}/onnxruntime-linux-x64-${ORT_VERSION}.tgz"
-          echo "Trying GitHub release asset: $url"
-          if curl -fSL --retry 2 --retry-all-errors -o ort.tgz "$url" && gzip -t ort.tgz 2>/dev/null; then
-            tar xzf ort.tgz
-            mv onnxruntime-linux-x64-${ORT_VERSION} ort
-          else
-            echo "GitHub asset unavailable; falling back to PyPI wheel + jsDelivr headers"
-            python3 -m pip download onnxruntime==${ORT_VERSION} --no-deps --only-binary=:all: -d ort_pkg -q
-            python3 - <<'PY'
-          import glob, os, shutil, zipfile
-          whl = glob.glob('ort_pkg/*.whl')[0]
+          python3 -m pip download onnxruntime --no-deps --only-binary=:all: -d ort_pkg -q
+          python3 - <<'PY'
+          import glob, os, re, shutil, zipfile
+          whl = sorted(glob.glob('ort_pkg/*.whl'))[-1]
+          ver = re.search(r'onnxruntime-([0-9.]+)-', os.path.basename(whl)).group(1)
           os.makedirs('ort/lib', exist_ok=True)
           os.makedirs('ort/include', exist_ok=True)
           with zipfile.ZipFile(whl) as z:
-          for n in z.namelist():
-          base = os.path.basename(n)
-          if n.startswith('onnxruntime/capi/libonnxruntime') and base:
-          with z.open(n) as f, open(os.path.join('ort/lib', base), 'wb') as o:
-          shutil.copyfileobj(f, o)
+              for n in z.namelist():
+                  base = os.path.basename(n)
+                  if n.startswith('onnxruntime/capi/libonnxruntime') and base:
+                      with z.open(n) as f, open(os.path.join('ort/lib', base), 'wb') as o:
+                          shutil.copyfileobj(f, o)
           real = next(f for f in os.listdir('ort/lib') if f.startswith('libonnxruntime.so.1.'))
           for alias in ('libonnxruntime.so.1', 'libonnxruntime.so'):
-          p = os.path.join('ort/lib', alias)
-          if os.path.exists(p):
-          os.remove(p)
-          os.symlink(real, p)
-          print('extracted', real)
-          PY
-            for h in onnxruntime_c_api.h onnxruntime_cxx_api.h onnxruntime_cxx_inline.h onnxruntime_ep_c_api.h onnxruntime_float16.h onnxruntime_lite_custom_op.h onnxruntime_run_options_config_keys.h; do
-              curl -fSL --retry 2 -o "ort/include/$h" "https://cdn.jsdelivr.net/gh/microsoft/onnxruntime@v${ORT_VERSION}/include/onnxruntime/core/session/$h"
-            done
-          fi
-          ls -la ort/lib | head
+              p = os.path.join('ort/lib', alias)
+              if os.path.lexists(p):
+                  os.remove(p)
+              os.symlink(real, p)
+          open('ort_version.txt', 'w').write(ver)
+          print('ONNX Runtime wheel version:', ver)
+PY
+          VER=$(cat ort_version.txt)
+          for h in onnxruntime_c_api.h onnxruntime_cxx_api.h onnxruntime_cxx_inline.h onnxruntime_ep_c_api.h onnxruntime_float16.h onnxruntime_lite_custom_op.h onnxruntime_run_options_config_keys.h; do
+            curl -fSL --retry 2 -o "ort/include/$h" "https://cdn.jsdelivr.net/gh/microsoft/onnxruntime@v${VER}/include/onnxruntime/core/session/$h"
+          done
       - name: Configure and build
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DONNXRUNTIME_ROOT="$PWD/ort"
@@ -157,8 +135,8 @@ jobs:
       - name: Download MNIST test set
         run: |
           mkdir -p models/mnist
-          curl -sSL https://ossci-datasets.s3.amazonaws.com/mnist/t10k-images-idx3-ubyte.gz | gunzip > models/mnist/t10k-images-idx3-ubyte
-          curl -sSL https://ossci-datasets.s3.amazonaws.com/mnist/t10k-labels-idx1-ubyte.gz | gunzip > models/mnist/t10k-labels-idx1-ubyte
+          curl -fSL --retry 2 https://ossci-datasets.s3.amazonaws.com/mnist/t10k-images-idx3-ubyte.gz | gunzip > models/mnist/t10k-images-idx3-ubyte
+          curl -fSL --retry 2 https://ossci-datasets.s3.amazonaws.com/mnist/t10k-labels-idx1-ubyte.gz | gunzip > models/mnist/t10k-labels-idx1-ubyte
       - name: Run benchmark
         run: |
           ./build/infercore_benchmark --models-dir models --iterations 1000 --eval-n 2000 --db bench_results.db 2>&1 | tee bench_results.txt
