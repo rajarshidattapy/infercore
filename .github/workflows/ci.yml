@@ -18,6 +18,8 @@ jobs:
         run: |
           python3 -m pip download onnxruntime --no-deps --only-binary=:all: -d ort_pkg -q
           python3 tools/extract_ort.py ort_pkg ort
+          mkdir -p ort/include
+          cp -r third_party/onnxruntime/include/onnxruntime ort/include/
           ls -la ort/lib ort/include
 
       - name: Download ONNX Runtime (Windows, NuGet)
@@ -80,6 +82,8 @@ jobs:
         run: |
           python3 -m pip download onnxruntime --no-deps --only-binary=:all: -d ort_pkg -q
           python3 tools/extract_ort.py ort_pkg ort
+          mkdir -p ort/include
+          cp -r third_party/onnxruntime/include/onnxruntime ort/include/
       - name: Configure and build
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DONNXRUNTIME_ROOT="$PWD/ort"
