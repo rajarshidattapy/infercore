@@ -10,11 +10,20 @@ namespace infercore {
 
 namespace {
 
+// On Windows, ORTCHAR_T is wchar_t and Ort::Session only accepts a wide path.
+std::basic_string<ORTCHAR_T> to_ort_path(const std::string& path) {
+#ifdef _WIN32
+  return std::wstring(path.begin(), path.end());
+#else
+  return path;
+#endif
+}
+
 class OnnxModel final : public IModel {
  public:
   explicit OnnxModel(const std::string& onnx_path)
       : env_(ORT_LOGGING_LEVEL_WARNING, "infercore"),
-        session_(env_, onnx_path.c_str(), Ort::SessionOptions{}) {
+        session_(env_, to_ort_path(onnx_path).c_str(), Ort::SessionOptions{}) {
     Ort::AllocatorWithDefaultOptions alloc;
     auto in_name = session_.GetInputNameAllocated(0, alloc);
     auto out_name = session_.GetOutputNameAllocated(0, alloc);
